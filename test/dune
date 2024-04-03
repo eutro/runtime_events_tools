@@ -11,6 +11,13 @@
   (>= %{ocaml_version} 5.1.0))
  (libraries runtime_events unix))
 
+(executable
+ (name test_fib_para)
+ (modules test_fib_para)
+ (enabled_if
+  (>= %{ocaml_version} 5.1.0))
+ (libraries runtime_events unix))
+
 (rule
  (alias runtest)
  (package runtime_events_tools)
@@ -47,10 +54,40 @@
 
 (rule
  (alias runtest)
+ (package runtime_events_tools)
+ (enabled_if
+  (>= %{ocaml_version} 5.1.0))
+ (deps %{bin:olly} test_fib_para.exe)
+ (action
+  (progn
+   (run olly trace test-para.trace ./test_fib_para.exe))))
+
+(rule
+ (alias runtest)
  (package runtime_events_tools_bare)
  (enabled_if
   (>= %{ocaml_version} 5.1.0))
  (deps %{bin:olly_bare} test_fib.exe)
  (action
   (progn
-   (run olly_bare trace --format=json test-bare-json.trace ./test_fib.exe))))
+   (run olly_bare trace --format=fuchsia test.bare.trace ./test_fib.exe))))
+
+(rule
+ (alias runtest)
+ (package runtime_events_tools_bare)
+ (enabled_if
+  (>= %{ocaml_version} 5.1.0))
+ (deps %{bin:olly_bare} test_fib.exe)
+ (action
+  (progn
+   (run olly_bare trace --format=json test-json.bare.trace ./test_fib.exe))))
+
+(rule
+ (alias runtest)
+ (package runtime_events_tools_bare)
+ (enabled_if
+  (>= %{ocaml_version} 5.1.0))
+ (deps %{bin:olly_bare} test_fib_para.exe)
+ (action
+  (progn
+   (run olly_bare trace test-para.bare.trace ./test_fib_para.exe))))

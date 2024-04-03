@@ -1,0 +1,13 @@
+lib: [
+  "_build/install/default/lib/runtime_events_tools/META"
+  "_build/install/default/lib/runtime_events_tools/dune-package"
+  "_build/install/default/lib/runtime_events_tools/opam"
+]
+bin: [
+  "_build/install/default/bin/olly"
+]
+doc: [
+  "_build/install/default/doc/runtime_events_tools/CHANGES.md"
+  "_build/install/default/doc/runtime_events_tools/LICENSE.md"
+  "_build/install/default/doc/runtime_events_tools/README.md"
+]

@@ -1,0 +1,13 @@
+lib: [
+  "_build/install/default/lib/runtime_events_tools_bare/META"
+  "_build/install/default/lib/runtime_events_tools_bare/dune-package"
+  "_build/install/default/lib/runtime_events_tools_bare/opam"
+]
+bin: [
+  "_build/install/default/bin/olly_bare"
+]
+doc: [
+  "_build/install/default/doc/runtime_events_tools_bare/CHANGES.md"
+  "_build/install/default/doc/runtime_events_tools_bare/LICENSE.md"
+  "_build/install/default/doc/runtime_events_tools_bare/README.md"
+]
