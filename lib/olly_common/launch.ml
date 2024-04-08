@@ -65,7 +65,11 @@ type consumer_config = {
 let empty_config =
   { handler = (fun _ -> ()); init = (fun () -> ()); cleanup = (fun () -> ()) }
 
-type common_args = { exec_args : string; src_table_path : string option }
+type common_args = {
+  replay : bool;
+  exec_args : string;
+  src_table_path : string option;
+}
 
 let our_handler (k : shim_callback) (evt : event) =
   match evt.tag with
@@ -84,11 +88,26 @@ let make_shim_callback src_table_path handler =
   in
   our_handler (map_names handler)
 
-let olly config { exec_args; src_table_path } =
+let launch_child cb { exec_args; _ } =
+  let child = exec_process exec_args in
+  Fun.protect ~finally:child.close (fun () ->
+      let callbacks = Construct.make_callbacks cb in
+      collect_events child callbacks)
+
+let replay_lines cb ic =
+  let rec loop () =
+    let line = input_line ic in
+    let evt = Olly_format_replay.parse ~line in
+    cb evt;
+    loop ()
+  in
+  try loop () with End_of_file -> ()
+
+let launch_replay cb opts =
+  In_channel.with_open_text opts.exec_args (replay_lines cb)
+
+let olly config opts =
   config.init ();
+  let cb = make_shim_callback opts.src_table_path config.handler in
   Fun.protect ~finally:config.cleanup (fun () ->
-      let child = exec_process exec_args in
-      Fun.protect ~finally:child.close (fun () ->
-          let cb = make_shim_callback src_table_path config.handler in
-          let callbacks = Construct.make_callbacks cb in
-          collect_events child callbacks))
+      (if opts.replay then launch_replay else launch_child) cb opts)

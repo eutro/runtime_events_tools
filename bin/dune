@@ -8,11 +8,12 @@
   olly_gc_stats
   olly_gen_tables
   olly_format_json
-  olly_format_fuchsia))
+  olly_format_fuchsia
+  olly_format_replay))
 
 (executable
  (package runtime_events_tools_bare)
  (public_name olly_bare)
  (name olly_bare)
  (modules olly_bare)
- (libraries olly_trace olly_gen_tables olly_format_json))
+ (libraries olly_trace olly_gen_tables olly_format_json olly_format_replay))
