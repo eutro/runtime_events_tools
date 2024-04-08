@@ -10,6 +10,19 @@ type _ custom_type +=
 
 type tag += Custom : 'a User.t * 'a custom_type -> tag
 
+let print_tag oc tag =
+  match tag with
+  | Custom (user, cty) ->
+      Printf.fprintf oc "{name: %s, cty: %s}" (User.name user)
+        (match cty with
+        | Span -> "span"
+        | Int -> "int"
+        | Unit -> "unit"
+        | _ -> "?");
+      true
+  | _ -> false
+
+let scan_tag _ = None
 let from_int x = Counter x
 let from_unit () = Instant
 

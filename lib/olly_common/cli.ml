@@ -33,6 +33,12 @@ let help man_format cmds topic =
           in
           `Ok (Manpage.print man_format Format.std_formatter page))
 
+let replay_option =
+  let doc =
+    "Read an olly replay trace, as generated with trace --format=replay."
+  in
+  Arg.(value & flag & info [ "replay" ] ~doc)
+
 let exec_args p =
   let doc =
     "Executable (and its arguments) to trace. If the executable takes\n\
@@ -52,10 +58,10 @@ let src_table_args =
     value & opt (some non_dir_file) None & info [ "table" ] ~docv:"PATH" ~doc)
 
 let common_args p =
-  let combine src_table_path exec_args : Launch.common_args =
-    { src_table_path; exec_args }
+  let combine src_table_path replay exec_args : Launch.common_args =
+    { src_table_path; exec_args; replay }
   in
-  Term.(const combine $ src_table_args $ exec_args p)
+  Term.(const combine $ src_table_args $ replay_option $ exec_args p)
 
 let main name commands =
   let help_cmd =

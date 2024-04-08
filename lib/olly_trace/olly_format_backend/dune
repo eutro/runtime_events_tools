@@ -9,6 +9,11 @@
  (libraries olly_format_backend))
 
 (library
+ (name olly_format_replay)
+ (modules olly_format_replay)
+ (libraries olly_format_backend))
+
+(library
  (name olly_format_fuchsia)
  (modules olly_format_fuchsia)
  (optional)

@@ -1,6 +1,7 @@
 type kind = ..
 
 type kind +=
+  | NoValue
   | SpanBegin
   | SpanEnd
   | Instant
