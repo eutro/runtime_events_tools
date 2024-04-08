@@ -95,17 +95,20 @@ let delimited_value k ic =
         match delim with
         | '{' -> recurse (depth + 1) buf ic
         | '}' ->
-           if depth > 0 then recurse (depth - 1) buf ic else Buffer.contents buf
+            if depth > 0 then recurse (depth - 1) buf ic
+            else Buffer.contents buf
         | _ -> failwith "unreachable")
   in
-  let s = Scanf.bscanf ic "%0c" (function
-              | '{' ->
-                 let buf = Buffer.create 16 in
-                 Scanf.bscanf ic "{" ();
-                 Buffer.add_char buf '{';
-                 recurse 0 buf ic
-              | _ -> Scanf.bscanf ic "%[^,}]" Fun.id)
-  in k s
+  let s =
+    Scanf.bscanf ic "%0c" (function
+      | '{' ->
+          let buf = Buffer.create 16 in
+          Scanf.bscanf ic "{" ();
+          Buffer.add_char buf '{';
+          recurse 0 buf ic
+      | _ -> Scanf.bscanf ic "%[^,}]" Fun.id)
+  in
+  k s
 
 let parse ~line =
   try

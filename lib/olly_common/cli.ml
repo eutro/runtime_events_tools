@@ -35,18 +35,32 @@ let help man_format cmds topic =
 
 let replay_option =
   let doc =
-    "Read an olly replay trace, as generated with trace --format=replay."
+    "Read an olly replay trace, as generated with `olly trace --format=replay`."
   in
-  Arg.(value & flag & info [ "replay" ] ~doc)
+  Arg.(
+    value & opt (some non_dir_file) None & info [ "replay" ] ~docv:"FILE" ~doc)
+
+let attach_option =
+  let doc =
+    "Attach to an external OCaml process, with the given pid, writing runtime \
+     events in the given directory. The user is responsible for ensuring that \
+     this process has started runtime events, either using \
+     `Runtime_events.start`, or by setting `OCAML_RUNTIME_EVENTS_START=1` \
+     before running. See https://v2.ocaml.org/manual/runtime-tracing.html."
+  in
+  Arg.(
+    value
+    & opt (some (pair ~sep:':' dir int)) None
+    & info [ "attach"; "a" ] ~docv:"DIRECTORY:PID" ~doc)
 
 let exec_args p =
   let doc =
     "Executable (and its arguments) to trace. If the executable takes\n\
-    \              arguments, wrap quotes around the executable and its \
-     arguments.\n\
+    \              arguments, they may be specified as trailing arguments, or \
+     as a single space-separated argument.\n\
     \              For example, olly '<exec> <arg_1> <arg_2> ... <arg_n>'."
   in
-  Arg.(required & pos p (some string) None & info [] ~docv:"EXECUTABLE" ~doc)
+  Arg.(value & pos_right (p - 1) string [] & info [] ~docv:"EXECUTABLE" ~doc)
 
 let src_table_args =
   let doc =
@@ -58,10 +72,28 @@ let src_table_args =
     value & opt (some non_dir_file) None & info [ "table" ] ~docv:"PATH" ~doc)
 
 let common_args p =
-  let combine src_table_path replay exec_args : Launch.common_args =
-    { src_table_path; exec_args; replay }
+  let combine src_table_path replay attach exec_args : Launch.common_args =
+    let attach_mode : Launch.attach_mode =
+      let exception Failed of string in
+      try
+        match (replay, attach, exec_args) with
+        | None, None, (_ :: _ as args) -> Child args
+        | Some file, None, [] -> Replay file
+        | None, Some (dir, pid), [] -> Attach (dir, pid)
+        | None, None, [] ->
+            raise (Failed "no EXECUTABLE, --replay, or --attach specified")
+        | _, _, _ ->
+            raise
+              (Failed
+                 "more than one of EXECUTABLE, --replay, or --attach specified")
+      with Failed s ->
+        Printf.eprintf "error: %s" s;
+        exit Cmd.Exit.cli_error
+    in
+    { src_table_path; attach_mode }
   in
-  Term.(const combine $ src_table_args $ replay_option $ exec_args p)
+  Term.(
+    const combine $ src_table_args $ replay_option $ attach_option $ exec_args p)
 
 let main name commands =
   let help_cmd =

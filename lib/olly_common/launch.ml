@@ -10,8 +10,37 @@ type subprocess = {
   close : unit -> unit;
 }
 
+let split_args exec_args =
+  match exec_args with
+  | [ arg ] ->
+      if Sys.file_exists arg then [ arg ] else String.split_on_char ' ' arg
+  | args -> args
+
+type alive_mode = Kill | Wait
+
+exception Could_not_attach of string
+
+let attach_process dir pid alive_mode =
+  let cursor = Runtime_events.create_cursor (Some (dir, pid)) in
+  let alive =
+    match alive_mode with
+    | Wait -> (
+        fun () ->
+          match Unix.waitpid [ Unix.WNOHANG ] pid with
+          | 0, _ -> true
+          | p, _ when p = pid -> false
+          | _, _ -> assert false)
+    | Kill -> (
+        fun () ->
+          try
+            Unix.kill pid 0;
+            true
+          with Unix.Unix_error (Unix.ESRCH, _, _) -> false)
+  and close () = Runtime_events.free_cursor cursor in
+  { alive; cursor; close }
+
 let exec_process exec_args =
-  let argsl = String.split_on_char ' ' exec_args in
+  let argsl = split_args exec_args in
   let executable_filename = List.hd argsl in
 
   (* TODO Set the temp directory. We should make this configurable. *)
@@ -30,14 +59,8 @@ let exec_process exec_args =
       Unix.stdin Unix.stdout Unix.stderr
   in
   Unix.sleepf 0.1;
-  let cursor = Runtime_events.create_cursor (Some (tmp_dir, child_pid)) in
-  let alive () =
-    match Unix.waitpid [ Unix.WNOHANG ] child_pid with
-    | 0, _ -> true
-    | p, _ when p = child_pid -> false
-    | _, _ -> assert false
-  and close () =
-    Runtime_events.free_cursor cursor;
+  let child = attach_process tmp_dir child_pid Wait in
+  let delete_buffer () =
     (* We need to remove the ring buffers ourselves because we told
        the child process not to remove them *)
     let ring_file =
@@ -45,7 +68,11 @@ let exec_process exec_args =
     in
     Unix.unlink ring_file
   in
-  { alive; cursor; close }
+  let close =
+    let { close; _ } = child in
+    fun () -> Fun.protect ~finally:delete_buffer close
+  in
+  { child with close }
 
 let collect_events child callbacks =
   (* Read from the child process *)
@@ -65,11 +92,12 @@ type consumer_config = {
 let empty_config =
   { handler = (fun _ -> ()); init = (fun () -> ()); cleanup = (fun () -> ()) }
 
-type common_args = {
-  replay : bool;
-  exec_args : string;
-  src_table_path : string option;
-}
+type attach_mode =
+  | Child of string list
+  | Replay of string
+  | Attach of string * int
+
+type common_args = { src_table_path : string option; attach_mode : attach_mode }
 
 let our_handler (k : shim_callback) (evt : event) =
   match evt.tag with
@@ -88,11 +116,13 @@ let make_shim_callback src_table_path handler =
   in
   our_handler (map_names handler)
 
-let launch_child cb { exec_args; _ } =
-  let child = exec_process exec_args in
+let child_common child cb =
   Fun.protect ~finally:child.close (fun () ->
       let callbacks = Construct.make_callbacks cb in
       collect_events child callbacks)
+
+let launch_child exec_args cb = child_common (exec_process exec_args) cb
+let launch_attach dir pid cb = child_common (attach_process dir pid Kill) cb
 
 let replay_lines cb ic =
   let rec loop () =
@@ -103,11 +133,14 @@ let replay_lines cb ic =
   in
   try loop () with End_of_file -> ()
 
-let launch_replay cb opts =
-  In_channel.with_open_text opts.exec_args (replay_lines cb)
+let launch_replay file cb = In_channel.with_open_text file (replay_lines cb)
 
 let olly config opts =
   config.init ();
   let cb = make_shim_callback opts.src_table_path config.handler in
   Fun.protect ~finally:config.cleanup (fun () ->
-      (if opts.replay then launch_replay else launch_child) cb opts)
+      (match opts.attach_mode with
+      | Child args -> launch_child args
+      | Attach (dir, pid) -> launch_attach dir pid
+      | Replay file -> launch_replay file)
+        cb)
